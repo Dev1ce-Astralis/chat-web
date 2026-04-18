@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智能对话 (RAG + Agent)</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root { --bg: #f8fafc; --card: #fff; --primary: #6366f1; --user: #6366f1; --ai: #e2e8f0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); margin: 0; height: 100vh; display: flex; flex-direction: column; }
+    header { background: var(--card); padding: 15px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+    h1 { margin: 0; font-size: 1.2rem; color: #1e293b; }
+    .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; transition: 0.2s; }
+    .btn-green { background: #10b981; color: white; } .btn-green:hover { background: #059669; }
+    #chat-box { flex: 1; background: var(--card); margin: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 15px; overflow-y: auto; }
+    .msg { margin: 10px 0; padding: 12px 16px; border-radius: 10px; max-width: 80%; line-height: 1.5; word-break: break-word; }
+    .user { background: var(--user); color: #fff; margin-left: auto; border-bottom-right-radius: 2px; }
+    .ai { background: var(--ai); color: #0f172a; margin-right: auto; border-bottom-left-radius: 2px; }
+    .input-area { display: flex; gap: 10px; padding: 15px; background: var(--card); border-top: 1px solid #e2e8f0; }
+    input[type="text"] { flex: 1; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; font-size: 15px; }
+    button.send { padding: 12px 24px; background: var(--primary); color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+    #loading { display: none; color: #64748b; font-size: 0.9em; margin: 5px 15px; text-align: center; }
+    pre { background: #f1f5f9; padding: 8px; border-radius: 6px; overflow-x: auto; }
+    code { font-family: ui-monospace, monospace; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🤖 RAG + Agent 智能对话</h1>
+    <label class="btn btn-green">
+      📤 上传文档
+      <input type="file" class="hidden" id="file-input" accept=".txt,.md" onchange="uploadFile(this)">
+    </label>
+  </header>
+  <div id="chat-box"></div>
+  <div id="loading">🧠 Agent 正在调用工具/检索文档...</div>
+  <div class="input-area">
+    <input type="text" id="input" placeholder="输入问题，或先上传文档再提问..." autocomplete="off">
+    <button class="send" id="send" onclick="send()">发送</button>
+  </div>
+
+  <script>
+    const chatBox = document.getElementById('chat-box');
+    const input = document.getElementById('input');
+    const loading = document.getElementById('loading');
+    const sessionId = 'sess_' + Math.random().toString(36).slice(2, 9);
+
+    function appendMsg(role, text) {
+      const div = document.createElement('div');
+      div.className = `msg ${role}`;
+      div.innerHTML = role === 'ai' ? marked.parse(text) : escapeHtml(text);
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+    function escapeHtml(t) { const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
+
+    async function uploadFile(el) {
+      const file = el.files[0]; if(!file) return;
+      const fd = new FormData(); fd.append('file', file);
+      appendMsg('user', `📤 上传文件: ${file.name}`);
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        appendMsg('ai', data.message);
+      } catch(e) { appendMsg('ai', '❌ 上传失败: ' + e.message); }
+      el.value = '';
+    }
+
+    async function send() {
+      const text = input.value.trim(); if(!text) return;
+      appendMsg('user', text); input.value = '';
+      input.disabled = true; loading.style.display = 'block';
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, session_id: sessionId })
+        });
+        const data = await res.json();
+        appendMsg('ai', data.reply || '⚠️ 无回复');
+      } catch(e) { appendMsg('ai', '❌ 请求失败: ' + e.message); }
+      finally { input.disabled = false; loading.style.display = 'none'; input.focus(); }
+    }
+    input.addEventListener('keypress', e => e.key === 'Enter' && send());
+  </script>
+</body>
+</html>
+ 
