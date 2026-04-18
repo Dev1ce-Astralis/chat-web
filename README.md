@@ -58,9 +58,9 @@ python main.py
 
 ## 示例
 
-![截图1](image/test1.png)
+![截图1](image/test2.png)
 **能正常对话**
 
-![截图2](image/test2.png)
+![截图2](image/test1.png)
 **能正常读文档**
 
